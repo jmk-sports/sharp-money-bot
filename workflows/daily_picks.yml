@@ -1,0 +1,60 @@
+# =================================================================
+# .github/workflows/daily_picks.yml
+# =================================================================
+# Runs daily at 5 PM ET | Manual trigger available
+# =================================================================
+
+name: Sharp Money Bot (Bluesky)
+
+on:
+  schedule:
+    - cron: "0 21 * * *"          # 21:00 UTC = 5 PM ET
+
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Create .env
+        run: |
+          cat <<EOF > .env
+          BLUESKY_HANDLE=${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD=${{ secrets.BLUESKY_PASSWORD }}
+          ODDS_API_KEY=${{ secrets.ODDS_API_KEY }}
+          GITHUB_TOKEN=${{ github.token }}
+          GITHUB_REPO=${{ github.repository }}
+          EOF
+
+      - name: Run Bot
+        env:
+          BLUESKY_HANDLE:   ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          ODDS_API_KEY:     ${{ secrets.ODDS_API_KEY }}
+          GITHUB_TOKEN:     ${{ github.token }}
+          GITHUB_REPO:      ${{ github.repository }}
+        run: python main.py
+
+      - name: Commit record.json
+        run: |
+          git config user.email "bot@sharp-money.dev"
+          git config user.name  "Sharp Money Bot"
+          git add record.json 2>/dev/null || true
+          if ! git diff --cached --quiet 2>/dev/null; then
+            git commit -m "chore: update record – $(date +%Y-%m-%d)"
+            git push
+          else
+            echo "No changes to commit"
+          fi
